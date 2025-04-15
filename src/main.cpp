@@ -4,6 +4,10 @@
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
+#include <regex>
+#include <string>
+#include <vector>
+#include <sstream>
 
 #define GFX_BL DF_GFX_BL // default backlight pin, you may replace DF_GFX_BL to actual backlight pin
 #define TFT_BL 27
@@ -62,7 +66,7 @@ void ShowImage(String path) {
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(19200);
   while (!Serial);
 
 
@@ -122,18 +126,127 @@ void setup()
    ShowImage("/Foxconn_logo.bmp");
 }
 
+std::vector<std::string> Split(std::string input) {
+  std::vector<std::string> result;
+  std::istringstream istream (input);
+  std::string token;    
+  while (getline(istream, token, ',')) {
+      result.push_back(token);
+  }
+
+  return result;
+}
+
+int64_t to_int(std::string str) {
+  std::istringstream istream(str);
+  int64_t result;
+  istream >> result;
+  return result;
+}
+
+void ClearScreen() {
+  gfx->fillScreen(BLACK);
+}
+
+void BackGroundOn() {
+  Serial.println("BackGroundOn");
+  pinMode(GFX_BL, OUTPUT);
+  digitalWrite(GFX_BL, HIGH);
+
+  ledcSetup(0, 2000, 8);
+  ledcAttachPin(TFT_BL, 0);
+  ledcWrite(0, 255); /* Screen brightness can be modified by adjusting this parameter. (0-255) */
+}
+
+void BackGroundOff() {
+  Serial.println("BackGroundOff");
+  pinMode(GFX_BL, OUTPUT);
+  digitalWrite(GFX_BL, LOW);
+
+  pinMode(TFT_BL, OUTPUT);
+  digitalWrite(TFT_BL, HIGH);
+  
+  ledcSetup(0, 2000, 8);
+  ledcAttachPin(TFT_BL, 0);
+  ledcWrite(0, 0); /* Screen brightness can be modified by adjusting this parameter. (0-255) */
+}
+
+void TextOut(String cmd) {
+  Serial.println("TextOut");
+  auto tokens = Split(cmd.c_str());
+  int64_t xcoord = to_int(tokens.at(1));
+  int64_t ycoord = to_int(tokens.at(2));
+  std::string msg = tokens.at(3);
+
+  gfx->setCursor(xcoord, ycoord);
+  gfx->setTextColor(RED);
+  gfx->setTextSize(3 /* x scale */, 3 /* y scale */, 0 /* pixel_margin */);
+  gfx->println(msg.c_str());
+}
+
+void ImgOut(String cmd) {
+  Serial.println("ImgOut");
+  auto tokens = Split(cmd.c_str());
+
+  String fileName = "/" + String(tokens.at(1).c_str());
+  if (SD.exists(fileName)) {
+    ShowImage(fileName);
+  } else {
+    Serial.printf("Error: No file Named `%s'\n", fileName.c_str());
+  }
+}
+
+String EvaluateCommand(String cmd) {
+  const std::regex ClearRGX{"<CLR>"};
+  const std::regex BkgOnRGX{"<BKG,ON>"};
+  const std::regex BkgOffRGX{"<BKG,OFF>"};
+  const std::regex TextOutRGX{"<OUT,[0-9]+,[0-9]+,[^>,]*>"};
+  const std::regex PicOutRGX{"<PIC,[^>,]+>"};
+
+  String eval;
+  String rest;
+  auto end = cmd.indexOf('\n');
+  if (end==-1) {
+    return cmd;
+  } 
+  else 
+  {
+    eval = cmd.substring(0, end);
+    // Serial.printf("eval='%s`\n", eval.c_str());
+    rest = cmd.substring(end+1,cmd.length());
+    // Serial.printf("rest='%s`\n", rest.c_str());
+  }
+  
+  std::cmatch match;
+  if (std::regex_match(eval.c_str(), match, ClearRGX)) {
+    ClearScreen();
+  } else if (std::regex_match(eval.c_str(), match, BkgOnRGX)) {
+    BackGroundOn();
+  } else if (std::regex_match(eval.c_str(), match, BkgOffRGX)) {
+    BackGroundOff();
+  } else if (std::regex_match(eval.c_str(), match, TextOutRGX)) {
+    TextOut(eval.substring(1,eval.length()-1));
+  } else if (std::regex_match(eval.c_str(), match, PicOutRGX)) {
+    ImgOut(eval.substring(1,eval.length()-1));
+  } else {
+    Serial.printf("Unkown command `%s'. Ignoring\n", eval.c_str());
+  }
+
+  return rest;
+}
+
 void loop()
 {
-  String a;
-
+  static String candidate;
+  
   while(Serial.available()) {
 
-    a = Serial.readString();// read the incoming data as string
-    
-    Serial.printf("command received: %s\n", a.c_str()); 
+    String tmp = Serial.readString();// read the incoming data as string
+    candidate.concat(tmp);
+    candidate.replace("\r", "");
 
-    if (SD.exists(a)) {
-      ShowImage(a);
-    }
+    // Serial.printf("command received: %s\n", candidate.c_str());
+
+    candidate = EvaluateCommand(candidate);
   }
 }
