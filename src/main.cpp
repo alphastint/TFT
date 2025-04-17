@@ -174,21 +174,52 @@ void BackGroundOff() {
 
 
 void TxtSize(String cmd) {
-  Serial.print("TextSize setted to:");
   auto tokens = Split(cmd.c_str());
   int txtmeret = to_int(tokens.at(1));
-  gfx->setTextSize(txtmeret,txtmeret, 0 /* pixel_margin */);
-  Serial.println(txtmeret);
-
+  gfx->setTextSize(txtmeret, txtmeret, 0 /* pixel_margin */);
+  Serial.printf("TextSize set to: %d\n", txtmeret);
 }
 
 
+
 void TxtColor(String cmd) {
-  Serial.println("TextColor Setted to");
   auto tokens = Split(cmd.c_str());
-   std::string txtszin = tokens.at(1);
-    gfx->setTextColor(txtszin);  //RED, WHITE, BLACK, BLUE, stb... 
-	 Serial.println(txtszin);
+  std::string txtszin = tokens.at(1);
+  const std::map<std::string, uint16_t> Colors {
+    // Color definitions
+    {"BLACK",BLACK},
+    {"NAVY",NAVY},
+    {"DARKGREEN",DARKGREEN},
+    {"DARKCYAN",DARKCYAN},
+    {"MAROON",MAROON},
+    {"PURPLE",PURPLE},
+    {"OLIVE",OLIVE},
+    {"LIGHTGREY",LIGHTGREY},
+    {"DARKGREY",DARKGREY},
+    {"BLUE",BLUE},
+    {"GREEN",GREEN},
+    {"CYAN",CYAN},
+    {"RED",RED},
+    {"MAGENTA",MAGENTA},
+    {"YELLOW",YELLOW},
+    {"WHITE",WHITE},
+    {"ORANGE",ORANGE},
+    {"GREENYELLOW",GREENYELLOW},
+    {"PINK",PINK}
+  };
+
+  if (Colors.count(txtszin)==0) {
+    Serial.printf("Invalid color: %s\n", txtszin.c_str());
+    Serial.printf("Allowed colors are: ");
+    for (const auto & color : Colors ) {
+      Serial.printf("%s, ", color.first.c_str());
+    }
+    return;
+  }
+
+  gfx->setTextColor(Colors.at(txtszin));
+
+  Serial.printf("TextColor Set to: %s\n", txtszin.c_str());
  }
 
 
@@ -223,8 +254,9 @@ String EvaluateCommand(String cmd) {
   const std::regex BkgOnRGX{"<BKG,ON>"};
   const std::regex BkgOffRGX{"<BKG,OFF>"};
   const std::regex TextOutRGX{"<OUT,[0-9]+,[0-9]+,[^>,]*>"};  
-  const std::regex TxtSize{"<SIZ,[0-9]+>"};  //LACI ! EZ Jó lett így? pl: <SIZ,8>
-  const std::regex TxtColor{"<COL,[^>,]*>"};//LACI ! EZ Jó lett így? pl: <COL,BLUE>
+  const std::regex TxtSizeRGX{"<SIZ,[0-9]+>"};  //LACI ! EZ Jó lett így? pl: <SIZ,8>
+  const std::regex TxtColorRGX{"<COL,[^>,]*>"};//LACI ! EZ Jó lett így? pl: <COL,BLUE>
+  const std::regex PicOutRGX{"<PIC,[^>,]+>"};
 
   String eval;
   String rest;
@@ -241,21 +273,23 @@ String EvaluateCommand(String cmd) {
   }
   
   std::cmatch match;
+  String ParameterPack = eval.substring(1,eval.length()-1);
+
   if (std::regex_match(eval.c_str(), match, ClearRGX)) {
     ClearScreen();
-  } else if (std::regex_match(eval.c_str(), match, txtSize)) {
-    TxtSize();
-} else if (std::regex_match(eval.c_str(), match, TxtColor)) {
-    TxtColor();
+  } else if (std::regex_match(eval.c_str(), match, TxtSizeRGX)) {
+    TxtSize(ParameterPack);
+} else if (std::regex_match(eval.c_str(), match, TxtColorRGX)) {
+    TxtColor(ParameterPack);
   } else if (std::regex_match(eval.c_str(), match, BkgOnRGX)) {
     BackGroundOn();
 	
   } else if (std::regex_match(eval.c_str(), match, BkgOffRGX)) {
     BackGroundOff();
   } else if (std::regex_match(eval.c_str(), match, TextOutRGX)) {
-    TextOut(eval.substring(1,eval.length()-1));
+    TextOut(ParameterPack);
   } else if (std::regex_match(eval.c_str(), match, PicOutRGX)) {
-    ImgOut(eval.substring(1,eval.length()-1));
+    ImgOut(ParameterPack);
   } else {
     Serial.printf("Unkown command `%s'. Ignoring\n", eval.c_str());
   }
