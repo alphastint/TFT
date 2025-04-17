@@ -83,11 +83,11 @@ void setup()
 #endif
 
   gfx->setCursor(10, 10);
-  gfx->setTextColor(RED);
-  gfx->println("Hello World!");
+  gfx->setTextColor(BLUE);
+  gfx->println("Cloud Network Technology Kft.");
 
   Serial.println("BMP Image Viewer");
-  delay(5000); // 5 seconds
+  delay(5); // 5 millisec
   
   // Init Display
   gfx->begin();
@@ -145,7 +145,8 @@ int64_t to_int(std::string str) {
 }
 
 void ClearScreen() {
-  gfx->fillScreen(BLACK);
+  //gfx->fillScreen(BLACK);
+  gfx->fillScreen(WHITE); //Black re érdekes módon fehér lett a kijelző, ezért gondolnám White-ra meg fekete lesz... meg kéne próbálni
 }
 
 void BackGroundOn() {
@@ -170,6 +171,27 @@ void BackGroundOff() {
   ledcAttachPin(TFT_BL, 0);
   ledcWrite(0, 0); /* Screen brightness can be modified by adjusting this parameter. (0-255) */
 }
+
+
+void TxtSize(String cmd) {
+  Serial.print("TextSize setted to:");
+  auto tokens = Split(cmd.c_str());
+  int txtmeret = to_int(tokens.at(1));
+  gfx->setTextSize(txtmeret,txtmeret, 0 /* pixel_margin */);
+  Serial.println(txtmeret);
+
+}
+
+
+void TxtColor(String cmd) {
+  Serial.println("TextColor Setted to");
+  auto tokens = Split(cmd.c_str());
+   std::string txtszin = tokens.at(1);
+    gfx->setTextColor(txtszin);  //RED, WHITE, BLACK, BLUE, stb... 
+	 Serial.println(txtszin);
+ }
+
+
 
 void TextOut(String cmd) {
   Serial.println("TextOut");
@@ -200,8 +222,9 @@ String EvaluateCommand(String cmd) {
   const std::regex ClearRGX{"<CLR>"};
   const std::regex BkgOnRGX{"<BKG,ON>"};
   const std::regex BkgOffRGX{"<BKG,OFF>"};
-  const std::regex TextOutRGX{"<OUT,[0-9]+,[0-9]+,[^>,]*>"};
-  const std::regex PicOutRGX{"<PIC,[^>,]+>"};
+  const std::regex TextOutRGX{"<OUT,[0-9]+,[0-9]+,[^>,]*>"};  
+  const std::regex TxtSize{"<SIZ,[0-9]+>"};  //LACI ! EZ Jó lett így? pl: <SIZ,8>
+  const std::regex TxtColor{"<COL,[^>,]*>"};//LACI ! EZ Jó lett így? pl: <COL,BLUE>
 
   String eval;
   String rest;
@@ -220,8 +243,13 @@ String EvaluateCommand(String cmd) {
   std::cmatch match;
   if (std::regex_match(eval.c_str(), match, ClearRGX)) {
     ClearScreen();
+  } else if (std::regex_match(eval.c_str(), match, txtSize)) {
+    TxtSize();
+} else if (std::regex_match(eval.c_str(), match, TxtColor)) {
+    TxtColor();
   } else if (std::regex_match(eval.c_str(), match, BkgOnRGX)) {
     BackGroundOn();
+	
   } else if (std::regex_match(eval.c_str(), match, BkgOffRGX)) {
     BackGroundOff();
   } else if (std::regex_match(eval.c_str(), match, TextOutRGX)) {
